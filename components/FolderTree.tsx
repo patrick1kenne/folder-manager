@@ -10,7 +10,10 @@ import {
   MoreHorizontal,
   Edit2,
   Trash2,
-  FolderPlus
+  FolderPlus,
+  Star,
+  Clock,
+  Home
 } from 'lucide-react';
 import { MediaFolder } from '@/types/media';
 import { Button } from '@/components/ui/button';
@@ -26,10 +29,15 @@ import { cn } from '@/lib/utils';
 interface FolderTreeProps {
   folders: MediaFolder[];
   currentFolder: MediaFolder | null;
-  onFolderSelect: (folder: MediaFolder) => void;
+  onFolderSelect: (folder: MediaFolder | null) => void;
   onToggleFolder: (folderId: string) => void;
   onCreateFolder: (parentId: string, name: string) => void;
   onUpdateFolder: (folderId: string, updates: Partial<MediaFolder>) => void;
+  onDeleteFolder: (folderId: string) => void;
+  onShowFavorites: () => void;
+  onShowRecent: () => void;
+  favoriteCount: number;
+  recentCount: number;
 }
 
 interface FolderNodeProps {
@@ -40,6 +48,7 @@ interface FolderNodeProps {
   onToggle: (folderId: string) => void;
   onCreateFolder: (parentId: string, name: string) => void;
   onUpdateFolder: (folderId: string, updates: Partial<MediaFolder>) => void;
+  onDeleteFolder: (folderId: string) => void;
 }
 
 const FolderNode: React.FC<FolderNodeProps> = ({
@@ -50,6 +59,7 @@ const FolderNode: React.FC<FolderNodeProps> = ({
   onToggle,
   onCreateFolder,
   onUpdateFolder,
+  onDeleteFolder,
 }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [editName, setEditName] = useState(folder.name);
@@ -76,6 +86,12 @@ const FolderNode: React.FC<FolderNodeProps> = ({
     setIsCreating(false);
   };
 
+  const handleDelete = () => {
+    if (confirm(`Êtes-vous sûr de vouloir supprimer le dossier "${folder.name}" ?`)) {
+      onDeleteFolder(folder.id);
+    }
+  };
+
   const handleKeyPress = (e: React.KeyboardEvent, action: 'edit' | 'create') => {
     if (e.key === 'Enter') {
       if (action === 'edit') handleSaveEdit();
@@ -86,12 +102,14 @@ const FolderNode: React.FC<FolderNodeProps> = ({
     }
   };
 
+  const fileCount = folder.files.length + folder.children.reduce((acc, child) => acc + child.files.length, 0);
+
   return (
     <div className="select-none">
       <div
         className={cn(
-          "flex items-center gap-1 px-2 py-1.5 rounded-md cursor-pointer hover:bg-accent group transition-colors",
-          isSelected && "bg-accent font-medium",
+          "flex items-center gap-1 px-2 py-2 rounded-lg cursor-pointer hover:bg-accent/50 group transition-all duration-200",
+          isSelected && "bg-accent font-medium shadow-sm",
         )}
         style={{ paddingLeft: `${level * 16 + 8}px` }}
       >
@@ -99,7 +117,7 @@ const FolderNode: React.FC<FolderNodeProps> = ({
           <Button
             variant="ghost"
             size="sm"
-            className="h-4 w-4 p-0 hover:bg-transparent"
+            className="h-5 w-5 p-0 hover:bg-accent/70 transition-colors"
             onClick={(e) => {
               e.stopPropagation();
               onToggle(folder.id);
@@ -115,9 +133,9 @@ const FolderNode: React.FC<FolderNodeProps> = ({
         
         <div className="flex items-center gap-2 flex-1 min-w-0">
           {folder.isExpanded && folder.children.length > 0 ? (
-            <FolderOpen className="h-4 w-4 text-blue-500 flex-shrink-0" />
+            <FolderOpen className="h-4 w-4 flex-shrink-0" style={{ color: folder.color }} />
           ) : (
-            <Folder className="h-4 w-4 text-blue-500 flex-shrink-0" />
+            <Folder className="h-4 w-4 flex-shrink-0" style={{ color: folder.color }} />
           )}
           
           {isEditing ? (
@@ -130,12 +148,14 @@ const FolderNode: React.FC<FolderNodeProps> = ({
               autoFocus
             />
           ) : (
-            <span
-              className="truncate text-sm flex-1"
-              onClick={() => onSelect(folder)}
-            >
-              {folder.name}
-            </span>
+            <div className="flex items-center gap-2 flex-1 min-w-0" onClick={() => onSelect(folder)}>
+              <span className="truncate text-sm flex-1">{folder.name}</span>
+              {fileCount > 0 && (
+                <span className="text-xs text-muted-foreground bg-muted px-1.5 py-0.5 rounded-full">
+                  {fileCount}
+                </span>
+              )}
+            </div>
           )}
         </div>
 
@@ -143,7 +163,7 @@ const FolderNode: React.FC<FolderNodeProps> = ({
           <Button
             variant="ghost"
             size="sm"
-            className="h-6 w-6 p-0"
+            className="h-6 w-6 p-0 hover:bg-accent/70"
             onClick={(e) => {
               e.stopPropagation();
               setIsCreating(true);
@@ -157,7 +177,7 @@ const FolderNode: React.FC<FolderNodeProps> = ({
               <Button
                 variant="ghost"
                 size="sm"
-                className="h-6 w-6 p-0"
+                className="h-6 w-6 p-0 hover:bg-accent/70"
                 onClick={(e) => e.stopPropagation()}
               >
                 <MoreHorizontal className="h-3 w-3" />
@@ -172,7 +192,7 @@ const FolderNode: React.FC<FolderNodeProps> = ({
                 <FolderPlus className="h-4 w-4 mr-2" />
                 Nouveau dossier
               </DropdownMenuItem>
-              <DropdownMenuItem className="text-destructive">
+              <DropdownMenuItem className="text-destructive" onClick={handleDelete}>
                 <Trash2 className="h-4 w-4 mr-2" />
                 Supprimer
               </DropdownMenuItem>
@@ -184,7 +204,7 @@ const FolderNode: React.FC<FolderNodeProps> = ({
       {isCreating && (
         <div style={{ paddingLeft: `${(level + 1) * 16 + 8}px` }} className="px-2 py-1">
           <div className="flex items-center gap-2">
-            <Folder className="h-4 w-4 text-blue-500" />
+            <Folder className="h-4 w-4 text-muted-foreground" />
             <Input
               value={newFolderName}
               onChange={(e) => setNewFolderName(e.target.value)}
@@ -208,6 +228,7 @@ const FolderNode: React.FC<FolderNodeProps> = ({
           onToggle={onToggle}
           onCreateFolder={onCreateFolder}
           onUpdateFolder={onUpdateFolder}
+          onDeleteFolder={onDeleteFolder}
         />
       ))}
     </div>
@@ -221,21 +242,75 @@ export const FolderTree: React.FC<FolderTreeProps> = ({
   onToggleFolder,
   onCreateFolder,
   onUpdateFolder,
+  onDeleteFolder,
+  onShowFavorites,
+  onShowRecent,
+  favoriteCount,
+  recentCount,
 }) => {
   return (
-    <div className="space-y-1">
-      {folders.map((folder) => (
-        <FolderNode
-          key={folder.id}
-          folder={folder}
-          level={0}
-          isSelected={currentFolder?.id === folder.id}
-          onSelect={onFolderSelect}
-          onToggle={onToggleFolder}
-          onCreateFolder={onCreateFolder}
-          onUpdateFolder={onUpdateFolder}
-        />
-      ))}
+    <div className="space-y-2">
+      {/* Quick Access */}
+      <div className="space-y-1">
+        <Button
+          variant={currentFolder === null ? "default" : "ghost"}
+          size="sm"
+          className="w-full justify-start h-9"
+          onClick={() => onFolderSelect(null)}
+        >
+          <Home className="h-4 w-4 mr-2" />
+          Tous les fichiers
+        </Button>
+        
+        <Button
+          variant="ghost"
+          size="sm"
+          className="w-full justify-start h-9"
+          onClick={onShowFavorites}
+        >
+          <Star className="h-4 w-4 mr-2" />
+          Favoris
+          {favoriteCount > 0 && (
+            <span className="ml-auto text-xs bg-muted px-1.5 py-0.5 rounded-full">
+              {favoriteCount}
+            </span>
+          )}
+        </Button>
+        
+        <Button
+          variant="ghost"
+          size="sm"
+          className="w-full justify-start h-9"
+          onClick={onShowRecent}
+        >
+          <Clock className="h-4 w-4 mr-2" />
+          Récents
+          {recentCount > 0 && (
+            <span className="ml-auto text-xs bg-muted px-1.5 py-0.5 rounded-full">
+              {recentCount}
+            </span>
+          )}
+        </Button>
+      </div>
+
+      <div className="h-px bg-border my-3" />
+
+      {/* Folder Tree */}
+      <div className="space-y-1">
+        {folders.map((folder) => (
+          <FolderNode
+            key={folder.id}
+            folder={folder}
+            level={0}
+            isSelected={currentFolder?.id === folder.id}
+            onSelect={onFolderSelect}
+            onToggle={onToggleFolder}
+            onCreateFolder={onCreateFolder}
+            onUpdateFolder={onUpdateFolder}
+            onDeleteFolder={onDeleteFolder}
+          />
+        ))}
+      </div>
     </div>
   );
 };

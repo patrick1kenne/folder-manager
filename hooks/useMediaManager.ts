@@ -39,6 +39,18 @@ export const useMediaManager = () => {
                 modifiedAt: new Date('2024-01-16'),
                 tags: ['vacances', 'montagne'],
                 isFavorite: false
+              },
+              {
+                id: 'f6',
+                name: 'coucher-soleil.jpg',
+                type: 'image',
+                size: 1800000,
+                url: 'https://images.pexels.com/photos/158163/clouds-cloudporn-weather-lookup-158163.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=650&w=940',
+                thumbnail: 'https://images.pexels.com/photos/158163/clouds-cloudporn-weather-lookup-158163.jpeg?auto=compress&cs=tinysrgb&dpr=1&h=200&w=300',
+                createdAt: new Date('2024-01-17'),
+                modifiedAt: new Date('2024-01-17'),
+                tags: ['vacances', 'coucher-soleil'],
+                isFavorite: true
               }
             ],
             createdAt: new Date('2024-01-15'),
@@ -194,6 +206,21 @@ export const useMediaManager = () => {
     });
   };
 
+  const deleteFolder = useCallback((folderId: string) => {
+    setState(prev => ({
+      ...prev,
+      folders: removeFolderFromTree(prev.folders, folderId),
+      currentFolder: prev.currentFolder?.id === folderId ? null : prev.currentFolder
+    }));
+  }, []);
+
+  const removeFolderFromTree = (folders: MediaFolder[], folderId: string): MediaFolder[] => {
+    return folders.filter(folder => folder.id !== folderId).map(folder => ({
+      ...folder,
+      children: removeFolderFromTree(folder.children, folderId)
+    }));
+  };
+
   const toggleFolder = useCallback((folderId: string) => {
     updateFolder(folderId, { isExpanded: !getFolderById(state.folders, folderId)?.isExpanded });
   }, [state.folders, updateFolder]);
@@ -219,12 +246,49 @@ export const useMediaManager = () => {
     setState(prev => ({ ...prev, viewMode: mode }));
   }, []);
 
+  const setSortBy = useCallback((sortBy: 'name' | 'date' | 'size' | 'type') => {
+    setState(prev => ({ ...prev, sortBy }));
+  }, []);
+
+  const setSortOrder = useCallback((sortOrder: 'asc' | 'desc') => {
+    setState(prev => ({ ...prev, sortOrder }));
+  }, []);
+
   const toggleFileSelection = useCallback((fileId: string) => {
     setState(prev => ({
       ...prev,
       selectedFiles: prev.selectedFiles.includes(fileId)
         ? prev.selectedFiles.filter(id => id !== fileId)
         : [...prev.selectedFiles, fileId]
+    }));
+  }, []);
+
+  const selectAllFiles = useCallback(() => {
+    setState(prev => ({
+      ...prev,
+      selectedFiles: filteredFiles.map(file => file.id)
+    }));
+  }, []);
+
+  const clearSelection = useCallback(() => {
+    setState(prev => ({ ...prev, selectedFiles: [] }));
+  }, []);
+
+  const toggleFileFavorite = useCallback((fileId: string) => {
+    setState(prev => ({
+      ...prev,
+      folders: prev.folders.map(folder => ({
+        ...folder,
+        files: folder.files.map(file => 
+          file.id === fileId ? { ...file, isFavorite: !file.isFavorite } : file
+        ),
+        children: folder.children.map(child => ({
+          ...child,
+          files: child.files.map(file => 
+            file.id === fileId ? { ...file, isFavorite: !file.isFavorite } : file
+          )
+        }))
+      }))
     }));
   }, []);
 
@@ -241,8 +305,14 @@ export const useMediaManager = () => {
     }
     
     return files.sort((a, b) => {
-      const aValue = a[state.sortBy];
-      const bValue = b[state.sortBy];
+      let aValue: any = a[state.sortBy];
+      let bValue: any = b[state.sortBy];
+      
+      if (state.sortBy === 'date') {
+        aValue = a.createdAt.getTime();
+        bValue = b.createdAt.getTime();
+      }
+      
       const modifier = state.sortOrder === 'asc' ? 1 : -1;
       
       if (aValue < bValue) return -1 * modifier;
@@ -251,16 +321,49 @@ export const useMediaManager = () => {
     });
   }, [state.currentFolder, state.searchQuery, state.sortBy, state.sortOrder]);
 
+  const allFiles = useMemo(() => {
+    const getAllFiles = (folders: MediaFolder[]): MediaFile[] => {
+      let files: MediaFile[] = [];
+      folders.forEach(folder => {
+        files = [...files, ...folder.files];
+        if (folder.children.length > 0) {
+          files = [...files, ...getAllFiles(folder.children)];
+        }
+      });
+      return files;
+    };
+    return getAllFiles(state.folders);
+  }, [state.folders]);
+
+  const favoriteFiles = useMemo(() => {
+    return allFiles.filter(file => file.isFavorite);
+  }, [allFiles]);
+
+  const recentFiles = useMemo(() => {
+    return [...allFiles]
+      .sort((a, b) => b.modifiedAt.getTime() - a.modifiedAt.getTime())
+      .slice(0, 10);
+  }, [allFiles]);
+
   return {
     state,
     updateFolder,
     createFolder,
+    deleteFolder,
     toggleFolder,
     setCurrentFolder,
     setSearchQuery,
     setViewMode,
+    setSortBy,
+    setSortOrder,
     toggleFileSelection,
+    selectAllFiles,
+    clearSelection,
+    toggleFileFavorite,
     filteredFiles,
+    allFiles,
+    favoriteFiles,
+    recentFiles,
     getFolderById
   };
 };

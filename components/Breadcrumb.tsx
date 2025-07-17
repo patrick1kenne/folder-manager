@@ -10,6 +10,8 @@ interface BreadcrumbProps {
   folders: MediaFolder[];
   onFolderSelect: (folder: MediaFolder | null) => void;
   getFolderById: (folders: MediaFolder[], folderId: string) => MediaFolder | null;
+  isSpecialView?: boolean;
+  specialViewTitle?: string;
 }
 
 export const Breadcrumb: React.FC<BreadcrumbProps> = ({
@@ -17,6 +19,8 @@ export const Breadcrumb: React.FC<BreadcrumbProps> = ({
   folders,
   onFolderSelect,
   getFolderById,
+  isSpecialView = false,
+  specialViewTitle
 }) => {
   const getPath = (folder: MediaFolder | null): MediaFolder[] => {
     if (!folder) return [];
@@ -39,29 +43,36 @@ export const Breadcrumb: React.FC<BreadcrumbProps> = ({
   const path = getPath(currentFolder);
 
   return (
-    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+    <div className="flex items-center gap-2 text-sm">
       <Button
         variant="ghost"
         size="sm"
-        className="h-8 px-2"
+        className="h-8 px-2 text-muted-foreground hover:text-foreground"
         onClick={() => onFolderSelect(null)}
       >
         <Home className="h-4 w-4" />
       </Button>
       
-      {path.map((folder, index) => (
-        <React.Fragment key={folder.id}>
-          <ChevronRight className="h-4 w-4" />
-          <Button
-            variant="ghost"
-            size="sm"
-            className="h-8 px-2 font-medium"
-            onClick={() => onFolderSelect(folder)}
-          >
-            {folder.name}
-          </Button>
-        </React.Fragment>
-      ))}
+      {isSpecialView ? (
+        <>
+          <ChevronRight className="h-4 w-4 text-muted-foreground" />
+          <span className="font-medium text-foreground">{specialViewTitle}</span>
+        </>
+      ) : (
+        path.map((folder, index) => (
+          <React.Fragment key={folder.id}>
+            <ChevronRight className="h-4 w-4 text-muted-foreground" />
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-8 px-2 font-medium text-foreground hover:bg-accent"
+              onClick={() => onFolderSelect(folder)}
+            >
+              {folder.name}
+            </Button>
+          </React.Fragment>
+        ))
+      )}
     </div>
   );
 };
